@@ -1,0 +1,14 @@
+streamlit
+yfinance
+pandas
+numpy
+matplotlib
+mplfinance
+FinMind
+plotly
+python-dotenv
+lxml
+requests
+torch
+huggingface-hub
+einops
