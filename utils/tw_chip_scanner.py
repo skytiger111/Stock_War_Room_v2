@@ -54,8 +54,8 @@ def _fetch_chip_history(dl: DataLoader, stock_id: str, days: int = 30) -> pd.Dat
 def _resolve_columns(pivot: pd.DataFrame):
     """找出 Foreign / Trust / Dealer 對應欄位名稱。"""
     cols = pivot.columns.tolist()
-    foreign_col = next((c for c in cols if 'Foreign' in str(c)), None)
-    trust_col = next((c for c in cols if 'Trust' in str(c) or 'Investment' in str(c)), None)
+    foreign_col = next((c for c in cols if c == 'Foreign_Investor'), None)
+    trust_col = next((c for c in cols if c == 'Investment_Trust'), None)
     dealer_cols = [c for c in cols if 'Dealer' in str(c)]
     return foreign_col, trust_col, dealer_cols
 
@@ -276,8 +276,8 @@ def calc_chip_strength(chip_df: pd.DataFrame) -> dict:
         }
 
     cols = chip_df.columns.tolist()
-    foreign_col = next((c for c in cols if 'Foreign' in str(c) or '外資' in str(c)), None)
-    trust_col = next((c for c in cols if 'Trust' in str(c) or '投信' in str(c)), None)
+    foreign_col = next((c for c in cols if c == 'Foreign_Investor'), None)
+    trust_col = next((c for c in cols if c == 'Investment_Trust'), None)
 
     # 連買天數 (正=連買, 負=連賣)
     def _streak(series):

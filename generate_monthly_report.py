@@ -55,7 +55,7 @@ def _env(key: str, default: str = "") -> str:
     return os.getenv(key) or _load_env().get(key, default)
 
 def _load_api_key():
-    return _env("GEMINI_API_KEY") or _env("GOOGLE_API_KEY")
+    return _env("OPENROUTER_API_KEY") or _env("GEMINI_API_KEY") or _env("GOOGLE_API_KEY")
 
 BENCHMARK = "^TWII"
 
@@ -273,28 +273,42 @@ def fetch_dividend_yield(symbol: str) -> str:
 # ═══════════════════════════════════════════════════════════
 
 def generate_ai_outlook(api_key: str, report_context: str) -> str:
-    if not api_key:
-        return "<em>（未提供 API Key，AI 點評略過）</em>"
-    import warnings
-    warnings.filterwarnings("ignore", message="All support for the `google.generativeai`")
-    import google.generativeai as genai
+    # 嘗試獲取 API Key
+    import os
+    import json
+    
+    # 優先從傳入參數獲取，若無則嘗試從系統或 env 獲取
+    or_key = api_key or os.getenv("OPENROUTER_API_KEY")
+
+    if not or_key:
+        # 最後嘗試手動讀取一次 .env
+        env_vars = _load_env()
+        or_key = env_vars.get("OPENROUTER_API_KEY")
+
+    if not or_key:
+        return "<em>（未提供 OPENROUTER_API_KEY，AI 點評略過。請檢查 /mnt/d/code/.env）</em>"
+    
+    # 使用 OpenRouter 調用 Gemini 模型
     try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        prompt = f"""你是 Tiger AI — 一位住在宜蘭、53 歲的理性冒險家暨資深投資人。
-你的主人 skytiger 持有以下 ETF/股票組合，以下是本月的績效與籌碼摘要：
-
-{report_context}
-
-請用繁體中文撰寫「下月展望與操作建議」，要求：
-1. 每檔標的一句話點評（含具體數據佐證）
-2. 整體資產配置建議（是否需要調整比重）
-3. 風險提醒（國際局勢、聯準會、台灣政策等）
-4. 語氣：務實、精準、像老朋友聊天，帶點登山/溯溪的譬喻
-5. 總字數 300-500 字，直接輸出正文（純文字，不要 markdown）"""
-        return model.generate_content(prompt).text
+        import requests
+        headers = {
+            "Authorization": f"Bearer {or_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": "google/gemini-2.0-flash-001",
+            "messages": [
+                {"role": "system", "content": "你是 Tiger AI — 一位住在宜蘭、53 歲的理性冒險家暨資深投資人。務實、精準、像老朋友聊天，帶點登山/溯溪的譬喻。"},
+                {"role": "user", "content": f"請針對以下持股績效與籌碼撰寫下月展望：\n{report_context}"}
+            ]
+        }
+        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, data=json.dumps(payload), timeout=30)
+        if response.status_code == 200:
+            return response.json()['choices'][0]['message']['content']
+        else:
+            return f"<em>OpenRouter 請求失敗 ({response.status_code}): {response.text}</em>"
     except Exception as e:
-        return f"<em>AI 點評生成失敗: {e}</em>"
+        return f"<em>AI 點評生成異常: {e}</em>"
 
 
 # ═══════════════════════════════════════════════════════════
@@ -302,7 +316,29 @@ def generate_ai_outlook(api_key: str, report_context: str) -> str:
 # ═══════════════════════════════════════════════════════════
 
 def _get_yilan_weather() -> tuple[str, str]:
-    """回傳 (weather_now, suggestion)。"""
+    """回傳 (weather_now, suggestion)。優先使用本地 CWA 腳本。"""
+    try:
+        import subprocess
+        # 呼叫主人的 CWA 氣象腳本
+        script_path = "/home/skytiger/.openclaw/workspace/scripts/get_cwa_weather.py"
+        python_path = "/mnt/d/code/venv_linux/bin/python3"
+        
+        if os.path.exists(script_path):
+            result = subprocess.run(
+                [python_path, script_path, "宜蘭縣"],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                # 簡化輸出，只取第一段預報
+                lines = [l for l in result.stdout.splitlines() if l.strip()]
+                if len(lines) >= 3:
+                    # 格式: 📅 2026-02-27 12:00 \n 🌧 陰短暫雨 | 🌡 17-19°C \n ☔ 降雨機率: 70%
+                    weather_info = f"{lines[2]} ({lines[3].replace('☔ ', '')})"
+                    return weather_info, ""
+    except Exception as e:
+        print(f"  ⚠️ CWA 腳本調用失敗: {e}")
+
+    # Fallback to wttr.in
     try:
         import requests
         resp = requests.get(

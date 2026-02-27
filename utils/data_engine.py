@@ -47,7 +47,24 @@ class DataEngine:
 
             # 整理數據：將買賣超張數合併
             df['net_buy'] = (df['buy'] - df['sell']) / 1000  # 轉為「張」
-            pivot_df = df.groupby(['date', 'name'])['net_buy'].sum().unstack()
+            pivot_df = df.groupby(['date', 'name'])['net_buy'].sum().unstack(fill_value=0)
+
+            # 欄位正規化：確保外資/投信/自營商明確可辨識
+            rename_map = {}
+            for c in pivot_df.columns:
+                if c == 'Foreign_Investor':
+                    rename_map[c] = 'Foreign_Investor'
+                elif c == 'Investment_Trust':
+                    rename_map[c] = 'Investment_Trust'
+                elif c in ('Dealer_self', 'Dealer_Hedging', 'Foreign_Dealer_Self'):
+                    rename_map[c] = c  # 保留原名
+
+            # 合併自營商子類為單一 Dealer 欄位
+            dealer_cols = [c for c in pivot_df.columns
+                           if c in ('Dealer_self', 'Dealer_Hedging', 'Foreign_Dealer_Self')]
+            if dealer_cols:
+                pivot_df['Dealer_Total'] = pivot_df[dealer_cols].sum(axis=1)
+
             return pivot_df
         except Exception as e:
             print(f"籌碼數據抓取失敗: {e}")

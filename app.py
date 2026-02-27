@@ -95,8 +95,8 @@ with tab1:
             # 法人概況
             if not chip_df.empty:
                 cols = chip_df.columns.tolist()
-                foreign_col = next((c for c in cols if 'Foreign' in str(c) or '外資' in str(c)), None)
-                trust_col = next((c for c in cols if 'Trust' in str(c) or '投信' in str(c)), None)
+                foreign_col = next((c for c in cols if c == 'Foreign_Investor'), None)
+                trust_col = next((c for c in cols if c == 'Investment_Trust'), None)
 
                 if foreign_col:
                     col3.metric("外資買賣超", f"{float(chip_df[foreign_col].iloc[-1]):+,.0f} 張")
