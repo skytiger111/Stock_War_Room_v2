@@ -9,9 +9,13 @@ from utils.tw_chip_scanner import (
 from utils.ai_writer import generate_stock_script
 from utils.ai_predictor import predict_stock_trend
 from utils.openinsider_fetcher import get_latest_cluster_buys, get_tw_block_trades
+from utils.stock2881int import calculate_arbitrage
 from datetime import datetime
 import numpy as np
 import os
+from dotenv import load_dotenv
+
+load_dotenv()  # 自動載入 .env
 
 # --- 1. 頁面配置 ---
 st.set_page_config(page_title="Tiger AI 股市戰情室 v2.0", layout="wide")
@@ -40,7 +44,7 @@ if inventory:
 # AI 設定
 st.sidebar.divider()
 st.sidebar.subheader("🔑 AI 設定")
-default_api_key = os.getenv("GEMINI_API_KEY", "")
+default_api_key = os.getenv("GOOGLE_API_KEY", "")
 gemini_api_key = st.sidebar.text_input("Gemini API Key", value=default_api_key, type="password")
 
 # 更新按鈕
@@ -53,7 +57,7 @@ if st.sidebar.button("🔄 清除快取 / 更新數據"):
 st.title("🐅 股市戰情室 v2.0")
 st.caption(f"更新時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-tab1, tab2, tab3, tab4 = st.tabs(["📉 個股戰情中心", "🕵️ 台股籌碼偵探", "💼 庫存健康監控", "🏦 大戶動向"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📉 個股戰情中心", "🕵️ 台股籌碼偵探", "💼 庫存健康監控", "🏦 大戶動向", "💰 質押套利試算"])
 
 # ========================
 # Tab 1: 個股戰情中心
@@ -571,7 +575,7 @@ with tab3:
         c3.metric("總損益", f"${total_pnl:+,.0f}",
                   f"{(total_pnl/total_cost)*100:+.1f}%" if total_cost > 0 else "")
     else:
-        st.warning("找不到庫存資料 (memory/inventory.md)。")
+        st.warning("找不到庫存資料 (agents/vault/vault_master.md)。")
 
 # ========================
 # Tab 4: 大戶動向
@@ -656,6 +660,12 @@ with tab4:
             else:
                 st.warning("目前無法取得 OpenInsider 數據，請稍後再試。")
 
-# --- 5. 頁腳 ---
+# ========================
+# Tab 5: 質押套利試算
+# ========================
+with tab5:
+    calculate_arbitrage()
+
+# --- 6. 頁腳 ---
 st.markdown("---")
 st.caption("🐅 Tiger AI 數據智囊團 | 僅供參考，投資請自行承擔風險。")

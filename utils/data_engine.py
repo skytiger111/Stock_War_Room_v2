@@ -72,30 +72,36 @@ class DataEngine:
 
     @st.cache_data(ttl=3600)
     def load_inventory(_self):
-        """讀取 memory/inventory.md 並解析持股"""
-        path = "/home/skytiger/.openclaw/workspace/memory/inventory.md"
-        if not os.path.exists(path):
+        """讀取 agents/vault/vault_master.md 並解析持股"""
+        import sys
+        path_str = "/home/skytiger/.openclaw/workspace/agents/vault/vault_master.md"
+        
+        # 兼容在 Windows 原生環境執行時，對應回 WSL 路徑
+        if sys.platform == "win32":
+            path_str = r"\\wsl$\Ubuntu" + path_str.replace("/", "\\")
+            
+        if not os.path.exists(path_str):
             return []
 
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path_str, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            # 正則匹配表格行: | 股票名稱 (代號) | 持有股數 | 成本均價 | 備註 |
+            # 正則匹配新表格: | 股票代號 | 名稱 | 持有股數 | 成本均價 |
             rows = re.findall(
-                r"\|\s*([^\|]+?)\s*\((\d{4,6}[A-Z]?)\)\s*\|\s*([\d,]+)\s*\|\s*([\d,.]+)\s*\|\s*(.*?)\s*\|",
+                r"\|\s*(\d{4,6}[A-Z]?)\s*\|\s*([^\|]+?)\s*\|\s*([\d,]+)\s*\|\s*([\d,.]+)\s*\|",
                 content
             )
 
             inventory = []
-            for name, code, shares, price, note in rows:
+            for code, name, shares, price in rows:
                 inventory.append({
                     "name": name.strip(),
                     "code": code.strip(),
                     "symbol": f"{code.strip()}.TW",
                     "shares": int(shares.strip().replace(',', '')),
                     "avg_price": float(price.strip().replace(',', '')),
-                    "note": note.strip()
+                    "note": ""
                 })
             return inventory
         except Exception as e:

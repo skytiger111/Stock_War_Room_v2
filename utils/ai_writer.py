@@ -1,7 +1,4 @@
-import warnings
-warnings.filterwarnings("ignore", message="All support for the `google.generativeai`")
-
-import google.generativeai as genai  # noqa: E402
+from google import genai  # noqa: E402
 import pandas as pd
 
 
@@ -13,8 +10,7 @@ def generate_stock_script(api_key, stock_name, symbol, price_df, chip_df=None):
         return "⚠️ 請提供 Gemini API Key 以使用此功能。"
 
     try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        client = genai.Client(api_key=api_key)
 
         # 處理 MultiIndex
         df = price_df.copy()
@@ -85,7 +81,10 @@ def generate_stock_script(api_key, stock_name, symbol, price_df, chip_df=None):
         風格：繁體中文，130-150 字，拒絕說教。直接輸出正文。
         """
 
-        response = model.generate_content(f"{system_prompt}\n\n{user_prompt}")
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=f"{system_prompt}\n\n{user_prompt}"
+        )
         return response.text
 
     except Exception as e:

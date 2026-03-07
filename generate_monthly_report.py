@@ -2,7 +2,7 @@
 """
 ETF 全能月報 自動化生成腳本 v2
 ═══════════════════════════════════════════════════
-動態讀取 inventory.md 持股 → 抓取數據 → 生成 HTML 月報 → Email 寄送。
+動態讀取 vault_master.md 持股 → 抓取數據 → 生成 HTML 月報 → Email 寄送。
 設計為 one-shot 執行，可直接掛載 cron。
 
 用法:
@@ -31,7 +31,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 REPORT_DIR = PROJECT_ROOT / "reports"
 REPORT_DIR.mkdir(exist_ok=True)
 
-INVENTORY_PATH = Path("/home/skytiger/.openclaw/workspace/memory/inventory.md")
+_RAW_INVENTORY_PATH = "/home/skytiger/.openclaw/workspace/agents/vault/vault_master.md"
+if sys.platform == "win32":
+    # 若在 Windows 原生執行，利用 UNC 路徑對應到 WSL 內部
+    _RAW_INVENTORY_PATH = r"\\wsl$\Ubuntu" + _RAW_INVENTORY_PATH.replace("/", "\\")
+INVENTORY_PATH = Path(_RAW_INVENTORY_PATH)
 
 # ─── .env 載入 ────────────────────────────────────────────
 _ENV_CACHE: dict = {}
@@ -82,7 +86,7 @@ def _infer_category(code: str) -> str:
 
 def load_inventory_for_report() -> list[dict]:
     """
-    從 inventory.md 讀取完整持股清單。
+    從 vault_master.md 讀取完整持股清單。
     回傳 list of dict: name, code, symbol, shares, avg_price, note, category
     """
     if not INVENTORY_PATH.exists():
@@ -91,19 +95,19 @@ def load_inventory_for_report() -> list[dict]:
 
     content = INVENTORY_PATH.read_text(encoding="utf-8")
     rows = re.findall(
-        r"\|\s*([^\|]+?)\s*\((\d{4,6}[A-Z]?)\)\s*\|\s*([\d,]+)\s*\|\s*([\d,.]+)\s*\|\s*(.*?)\s*\|",
+        r"\|\s*(\d{4,6}[A-Z]?)\s*\|\s*([^\|]+?)\s*\|\s*([\d,]+)\s*\|\s*([\d,.]+)\s*\|",
         content,
     )
 
     inventory = []
-    for name, code, shares, price, note in rows:
+    for code, name, shares, price in rows:
         inventory.append({
             "name": name.strip(),
             "code": code.strip(),
             "symbol": f"{code.strip()}.TW",
             "shares": int(shares.strip().replace(",", "")),
             "avg_price": float(price.strip().replace(",", "")),
-            "note": note.strip(),
+            "note": "",
             "category": _infer_category(code.strip()),
         })
     return inventory
